@@ -14,6 +14,9 @@
 
 > 本工具僅做公開資料的機械式篩選與歷史回測，**不構成任何投資建議**。
 
+> **這是跟台股雷達分開的另一套系統**，放在 `C:\Users\leade\Desktop\Dropbox\00_TWSA`，
+> 網址是 8900（台股雷達是 8899）。兩者的關係見 [`與台股雷達的關係.md`](與台股雷達的關係.md)。
+
 ---
 
 ## 目錄
@@ -53,7 +56,7 @@
   - **本地網頁儀表板**（主要介面，只用標準庫，免裝 Flask）：輸入代號查詢、K 線＋均線＋訊號標記、法人／營收／財報表格、回測權益曲線、一鍵選股、匯出 Excel / CSV
   - **Tkinter 桌面版**（選用）：同樣的查詢、選股、匯出
   - **命令列**：適合排程或批次
-- **79 個單元測試**，已在雲端環境實際執行全部通過
+- **80 個單元測試**，已在雲端環境實際執行全部通過
 
 ---
 
@@ -68,7 +71,7 @@
 
 ```bat
 :: 1. 進入專案資料夾
-cd tw_stock_analyzer
+cd C:\Users\leade\Desktop\Dropbox\00_TWSA
 
 :: 2. 安裝套件（Windows 也可以直接雙擊 install.bat）
 python -m pip install -r requirements.txt
@@ -134,7 +137,7 @@ python -m twsa --radar-dir "D:\Dropbox\00money" web
 | `data/stock_names.json`、`groups.csv` 名稱欄 | 代號 → 名稱 | 顯示名稱（自動去掉你加的 `*` 記號） |
 | `data/markets.json` | 代號 → 上市／上櫃 | 網路備援時決定先問證交所還是櫃買 |
 
-**只讀不寫**：這套系統不會修改台股雷達的任何檔案，自己的快取與匯出放在 `tw_stock_analyzer/data/`。
+**只讀不寫**：這套系統不會修改台股雷達的任何檔案，自己的快取與匯出放在 `00_TWSA\data\`。
 兩個程式可以同時開（台股雷達 8899、這套 8900）。
 
 ### 自動辨識資料格式
@@ -254,7 +257,7 @@ python -m twsa --radar-dir "D:\Dropbox\00money" ...   :: 指定台股雷達位�
 python -m twsa --config my_settings.json ...          :: 指定設定檔
 ```
 
-`--export` 的檔案存在 `tw_stock_analyzer/data/exports/`。
+`--export` 的檔案存在 `00_TWSA\data\exports\`。
 
 ---
 
@@ -363,8 +366,9 @@ python -m twsa --config my_settings.json ...          :: 指定設定檔
 ## 資料夾結構
 
 ```
-tw_stock_analyzer/
+00_TWSA/（在 repo 裡叫 tw_stock_analyzer/）
 ├── README.md                     ← 本說明書
+├── 與台股雷達的關係.md            ← 兩套系統的分工、位置、網址
 ├── requirements.txt              ← 相依套件
 ├── pyproject.toml                ← 套件設定（含 pytest 設定，可 pip install -e .）
 ├── twsa_settings.example.json    ← 設定檔範本
@@ -394,7 +398,7 @@ tw_stock_analyzer/
 │   └── web/                      ← 【模組三】本地網頁儀表板
 │       ├── server.py             ←   標準庫 http.server + JSON API
 │       └── index.html            ←   單頁介面（K 線用 SVG 畫，不需外部套件）
-├── tests/                        ← 單元測試（79 個）
+├── tests/                        ← 單元測試（80 個）
 │   ├── conftest.py               ←   共用 fixture：假台股雷達資料夾、假網路 session
 │   ├── test_indicators.py
 │   ├── test_strategies.py
@@ -435,7 +439,7 @@ python -m pytest -v     :: 逐一列出每個測試
 $ python -m pytest
 ........................................................................ [ 91%]
 .......                                                                  [100%]
-79 passed in 6.13s
+80 passed in 5.42s
 ```
 
 另外也實際啟動了網頁儀表板，用無頭瀏覽器操作「個股查詢」與「一鍵選股」，畫面正常、瀏覽器主控台沒有錯誤。

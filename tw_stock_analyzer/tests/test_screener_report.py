@@ -34,6 +34,13 @@ def test_lookback_widens_matches(demo_hub):
     assert r10.table.loc[r10.table["符合"], "幾根前"].between(0, 10).all()
 
 
+def test_screen_with_no_trades_at_all(demo_hub):
+    # 門檻高到永遠不成立 → 每檔都 0 筆交易，不能因此出錯
+    r = screen(demo_hub, ["2330", "2317"], "chip_concentration", params={"min_conc": 1e9})
+    assert r.trades.empty and r.summary["trades"] == 0 and r.summary["matched"] == 0
+    assert report.to_excel_bytes(r)
+
+
 def test_screen_reports_missing_stocks(tmp_path):
     from twsa.config import Settings
     hub = DataHub(Settings(data_dir=str(tmp_path), use_network=False))

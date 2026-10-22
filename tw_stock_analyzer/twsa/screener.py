@@ -102,8 +102,8 @@ def screen(hub: DataHub, codes: list[str], strategy_key: str, params: dict | Non
     if len(table):
         table = table.sort_values(["符合", "回測勝率%"], ascending=[False, False], na_position="last")
         table = table.reset_index(drop=True)
-    trades = pd.concat([r.trades.assign(代號=c, 名稱=hub.name(c)) for c, r in results.items() if len(r.trades)],
-                       ignore_index=True) if results else pd.DataFrame()
+    parts = [r.trades.assign(代號=c, 名稱=hub.name(c)) for c, r in results.items() if len(r.trades)]
+    trades = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
     summary = portfolio_summary(results)
     summary.pop("equity", None)
     summary["matched"] = int(table["符合"].sum()) if len(table) else 0
@@ -113,4 +113,3 @@ def screen(hub: DataHub, codes: list[str], strategy_key: str, params: dict | Non
 
 def _pct(v):
     return None if v is None or pd.isna(v) else round(float(v) * 100, 2)
-
