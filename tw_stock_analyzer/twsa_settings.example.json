@@ -1,0 +1,13 @@
+{
+  "radar_dir": "C:\\Users\\leade\\Desktop\\Dropbox\\00money",
+  "finmind_token": "",
+  "use_network": true,
+  "request_gap": 1.2,
+  "port": 8900,
+  "radar_inst_unit": "auto",
+  "radar_columns": {
+    "price": ["open", "high", "low", "close", "volume"],
+    "inst": ["foreign", "trust", "dealer", "total"],
+    "revenue": ["revenue"]
+  }
+}

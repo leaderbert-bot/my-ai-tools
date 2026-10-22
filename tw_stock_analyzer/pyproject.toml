@@ -1,0 +1,22 @@
+[project]
+name = "twsa"
+version = "1.0.0"
+description = "台股動能、基本面財報與籌碼分佈綜合分析系統"
+requires-python = ">=3.10"
+dependencies = ["pandas>=2.0", "numpy>=1.24", "requests>=2.28", "openpyxl>=3.1"]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[project.scripts]
+twsa = "twsa.__main__:main"
+
+[tool.setuptools]
+packages = ["twsa", "twsa.data", "twsa.web"]
+
+[tool.setuptools.package-data]
+"twsa.web" = ["index.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

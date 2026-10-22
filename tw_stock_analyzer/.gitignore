@@ -1,0 +1,5 @@
+/data/
+/twsa_settings.json
+__pycache__/
+*.pyc
+.pytest_cache/
