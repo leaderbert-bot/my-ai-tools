@@ -121,21 +121,40 @@ def find_events(px, cal, since, kinds, touch, punish):
     return ev
 
 
-def out_path(R, ym):
-    return os.path.join(R.DATA_DIR, "stk1m", "stk1m_%s.json.gz" % ym)
+def host_tag():
+    """這台電腦的名字：每台電腦只寫自己的檔（stk1m_YYYY-MM.<電腦>.json.gz），兩台同時跑也不會在 Dropbox 打架。"""
+    import socket, re
+    return re.sub(r"[^A-Za-z0-9_-]", "_", socket.gethostname())[:24] or "pc"
 
 
-def load_month(R, ym):
-    p = out_path(R, ym)
+def out_path(R, ym, host=None):
+    return os.path.join(R.DATA_DIR, "stk1m", "stk1m_%s.%s.json.gz" % (ym, host or host_tag()))
+
+
+def load_month(R, ym, host=None):
+    p = out_path(R, ym, host)
     if not os.path.exists(p):
-        return {"v": 1, "src": SRC, "done": {}, "bars": {}}
+        return {"v": 1, "src": SRC, "host": host or host_tag(), "done": {}, "bars": {}}
     try:
         with gzip.open(p, "rt", encoding="utf-8") as f:
             d = json.load(f)
         d.setdefault("done", {}); d.setdefault("bars", {})
         return d
     except Exception:
-        return {"v": 1, "src": SRC, "done": {}, "bars": {}}
+        return {"v": 1, "src": SRC, "host": host or host_tag(), "done": {}, "bars": {}}
+
+
+def done_everywhere(R, ym):
+    """這個月所有電腦已經抓過的 (代號|日期)，含舊版沒有電腦名的檔。"""
+    import glob
+    out = set()
+    for p in glob.glob(os.path.join(R.DATA_DIR, "stk1m", "stk1m_%s*.json.gz" % ym)):
+        try:
+            with gzip.open(p, "rt", encoding="utf-8") as f:
+                out.update((json.load(f).get("done") or {}).keys())
+        except Exception:
+            pass
+    return out
 
 
 def save_month(R, ym, d):
@@ -188,11 +207,15 @@ def main():
     print("  事件 (代號,日期) 共 %d 筆：%s" % (len(ev), "、".join("%s %d" % (k, n) for k, n in sorted(by_kind.items()))))
     months = sorted(set(d[:7] for _, d in ev))
     cache = {ym: load_month(R, ym) for ym in months}
-    todo = sorted((c, d) for (c, d) in ev if (c + "|" + d) not in cache[d[:7]]["done"])
+    done_all = {ym: done_everywhere(R, ym) for ym in months}
+    todo = sorted((c, d) for (c, d) in ev if (c + "|" + d) not in done_all[d[:7]])
     done = len(ev) - len(todo)
     print("  已抓 %d、還要抓 %d（每筆約 270 根、約 25 KB；永豐每天有流量上限，用完明天再跑會接著抓）" % (done, len(todo)))
+    print("  這台電腦：%s。兩台可以同時跑，各寫自己的檔，順序錯開，不會重複太多。" % host_tag())
     if a.list or not todo:
         return 0
+    import random
+    random.Random(host_tag()).shuffle(todo)      # 每台電腦用不同順序抓，兩台同時跑才不會抓同一批
     print("  登入永豐（只看行情）…")
     api = R._sj_login()
     rb = remaining_bytes(api)
@@ -201,6 +224,8 @@ def main():
     n_ok = n_fail = n_none = 0; dirty = set(); t0 = time.time(); stop = False
     for i, (c, d) in enumerate(todo):
         ym = d[:7]
+        if (c + "|" + d) in done_all[ym]:
+            continue                                   # 另一台剛抓過了
         ct = R._sj_contract(api, c)
         if ct is None:
             cache[ym]["done"][c + "|" + d] = "no-contract"; dirty.add(ym); n_none += 1
@@ -240,6 +265,8 @@ def main():
         if (i + 1) % SAVE_EVERY == 0:
             for m in dirty: save_month(R, m, cache[m])
             dirty.clear()
+            for m in set(x[1][:7] for x in todo[i + 1:i + 1 + SAVE_EVERY * 4]):
+                done_all[m] = done_everywhere(R, m)    # 看一下另一台抓到哪了
             rb = remaining_bytes(api)
             el = time.time() - t0
             print("  %5d / %d  成功 %d、空 %d、失敗 %d  %.0f 秒%s" % (

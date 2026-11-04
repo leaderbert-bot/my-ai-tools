@@ -22,21 +22,41 @@ SAVE_EVERY = 20
 SRC = "TWSE T86 + TPEx insti/dailyTrade，張；[外資, 投信, 自營]"
 
 
-def out_path(R, y):
-    return os.path.join(R.DATA_DIR, "inst10", "inst10_%s.json.gz" % y)
+def host_tag():
+    """每台電腦只寫自己的檔（inst10_YYYY.<電腦>.json.gz），兩台同時跑也不會在 Dropbox 打架。"""
+    import socket, re
+    return re.sub(r"[^A-Za-z0-9_-]", "_", socket.gethostname())[:24] or "pc"
 
 
-def load_year(R, y):
-    p = out_path(R, y)
+def out_path(R, y, host=None):
+    return os.path.join(R.DATA_DIR, "inst10", "inst10_%s.%s.json.gz" % (y, host or host_tag()))
+
+
+def load_year(R, y, host=None):
+    p = out_path(R, y, host)
     if not os.path.exists(p):
-        return {"v": 1, "src": SRC, "days": {}, "empty": []}
+        return {"v": 1, "src": SRC, "host": host or host_tag(), "days": {}, "empty": []}
     try:
         with gzip.open(p, "rt", encoding="utf-8") as f:
             d = json.load(f)
         d.setdefault("days", {}); d.setdefault("empty", [])
         return d
     except Exception:
-        return {"v": 1, "src": SRC, "days": {}, "empty": []}
+        return {"v": 1, "src": SRC, "host": host or host_tag(), "days": {}, "empty": []}
+
+
+def done_everywhere(R, y):
+    """這一年所有電腦已經查過的日期（有資料的和空的）。"""
+    import glob
+    out = set()
+    for p in glob.glob(os.path.join(R.DATA_DIR, "inst10", "inst10_%s*.json.gz" % y)):
+        try:
+            with gzip.open(p, "rt", encoding="utf-8") as f:
+                d = json.load(f)
+            out.update((d.get("days") or {}).keys()); out.update(d.get("empty") or [])
+        except Exception:
+            pass
+    return out
 
 
 def save_year(R, y, d):
@@ -75,13 +95,19 @@ def main():
     cal = calendar(R, a.since, until)
     years = sorted(set(d[:4] for d in cal))
     cache = {y: load_year(R, y) for y in years}
-    todo = [d for d in cal if d not in cache[d[:4]]["days"] and d not in cache[d[:4]]["empty"]]
+    done_all = {y: done_everywhere(R, y) for y in years}
+    todo = [d for d in cal if d not in done_all[d[:4]]]
     print("  %s ～ %s：%d 天要查，已有 %d 天" % (a.since, until, len(todo), len(cal) - len(todo)))
+    print("  這台電腦：%s。兩台可以同時跑，各寫自己的檔，順序錯開。" % host_tag())
     if not todo:
         print("  都補好了。"); return 0
+    import random
+    random.Random(host_tag()).shuffle(todo)
     n_ok = n_empty = 0; dirty = set(); t0 = time.time()
     for i, d in enumerate(todo):
         y = d[:4]
+        if d in done_all[y]:
+            continue
         got = R.fetch_inst_day(d)
         if got:
             cache[y]["days"][d] = got; n_ok += 1
@@ -91,6 +117,8 @@ def main():
         if (i + 1) % SAVE_EVERY == 0:
             for yy in dirty: save_year(R, yy, cache[yy])
             dirty.clear()
+            for yy in years:
+                done_all[yy] = done_everywhere(R, yy)
             el = time.time() - t0; eta = el / (i + 1) * (len(todo) - i - 1)
             print("  %5d / %d  有資料 %d、空 %d  已 %.0f 分，約再 %.0f 分" % (i + 1, len(todo), n_ok, n_empty, el / 60, eta / 60))
         time.sleep(a.sleep)
