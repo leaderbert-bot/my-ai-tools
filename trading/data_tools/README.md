@@ -62,3 +62,4 @@ python stk1m_dl.py --touch                :: 也抓「盤中碰到漲停沒鎖�
 - `fund1d_early.py` ＋ `基本面1D早年驗證.bat`（11-05）：用 data/k00y 重算 2003～2015 的 fundall／fund1D／fundhi／99%／1D+一年高，含「創新高優先」排序的早年驗證。約 1～2 小時，輸出 `基本面1D早年驗證.md`。
 - `crash_pool.py` ＋ `融資斷頭貨帳戶模擬.bat`（11-05）：借雷達 cr10_build 的逐筆交易（V2～V5 × 20／60 天）放進 0050 小帳戶算年化回撤。輸出 `融資斷頭貨帳戶模擬.md`。
 - `daytrade_1m.py` ＋ `當沖盤中驗證.bat`（11-05）：用 1 分 K 驗當沖三招（鎖漲停隔天開高空五種出場、恐慌急殺隔天三種、處置股盤中結構）；抓到多少算多少。輸出 `當沖盤中驗證.md`。
+- `pdf2text.py`／`pdf_ocr.py` ＋ `講義轉文字.bat`／`講義OCR.bat`（11-05）：把 Dropbox\講義 的 PDF 抽成文字；講義全是圖片頁，要用 OCR 版（PyMuPDF＋RapidOCR）。輸出 `講義_text/`。
