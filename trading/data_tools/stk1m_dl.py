@@ -25,6 +25,7 @@ import os, sys, json, gzip, time, argparse
 from datetime import date, datetime, timedelta
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+R_contract = None                        # main() 裡接上 tw_radar._sj_contract
 sys.path.insert(0, HERE)
 
 SAVE_EVERY = 50
@@ -151,7 +152,7 @@ def done_everywhere(R, ym):
     for p in glob.glob(os.path.join(R.DATA_DIR, "stk1m", "stk1m_%s*.json.gz" % ym)):
         try:
             with gzip.open(p, "rt", encoding="utf-8") as f:
-                out.update((json.load(f).get("done") or {}).keys())
+                out.update(k for k, v in (json.load(f).get("done") or {}).items() if v != "no-contract")
         except Exception:
             pass
     return out
@@ -176,6 +177,54 @@ def remaining_bytes(api):
     return None
 
 
+def get_contract(api, code):
+    """代號 → 合約。先用雷達的寫法，再逐個交易所找（TSE 上市、OTC 上櫃、OES 興櫃）。"""
+    code = str(code)
+    try:
+        ct = R_contract(api, code) if R_contract else None
+        if ct is not None:
+            return ct
+    except Exception:
+        pass
+    st = getattr(getattr(api, "Contracts", None), "Stocks", None)
+    for ex in ("TSE", "OTC", "OES"):
+        try:
+            g = getattr(st, ex, None)
+            if g is None:
+                continue
+            ct = g[code] if hasattr(g, "__getitem__") else None
+            if ct is not None:
+                return ct
+        except Exception:
+            pass
+    return None
+
+
+def wait_contracts(api, sample_codes, max_wait=120):
+    """登入後合約表是在背景慢慢載的，沒等它載完就查，上市股也會查不到（之前 7 成事件因此被跳過）。
+    等到 status 變 Fetched、而且抽樣的代號大多找得到才開始。"""
+    t0 = time.time(); last = -1
+    while time.time() - t0 < max_wait:
+        st = str(getattr(getattr(api, "Contracts", None), "status", "") or "")
+        found = sum(1 for c in sample_codes if get_contract(api, c) is not None)
+        if found != last:
+            print("  合約表：%s，抽樣 %d 個代號找得到 %d 個" % (st or "?", len(sample_codes), found))
+            last = found
+        if "Fetched" in st and found >= len(sample_codes) * 0.8:
+            return True
+        if "Fetched" in st and found >= len(sample_codes) * 0.5 and time.time() - t0 > 20:
+            return True
+        time.sleep(3)
+    try:
+        api.fetch_contracts(contract_download=True)
+        time.sleep(10)
+    except Exception:
+        pass
+    found = sum(1 for c in sample_codes if get_contract(api, c) is not None)
+    print("  合約表等了 %d 秒：抽樣 %d 個找得到 %d 個。找不到的會記成 no-contract，下次跑會再試。" % (max_wait, len(sample_codes), found))
+    return found > 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--since", default="2020-01-01")
@@ -186,6 +235,8 @@ def main():
     ap.add_argument("--sleep", type=float, default=0.4)
     a = ap.parse_args()
     import tw_radar as R
+    global R_contract
+    R_contract = getattr(R, "_sj_contract", None)
     kinds = set(a.kinds.split(","))
     print("  讀 data/k10y 日 K、找事件日…")
     px, cal = load_daily(R, a.since, date.today())
@@ -210,7 +261,10 @@ def main():
     done_all = {ym: done_everywhere(R, ym) for ym in months}
     todo = sorted((c, d) for (c, d) in ev if (c + "|" + d) not in done_all[d[:7]])
     done = len(ev) - len(todo)
+    n_nc = sum(1 for ym in months for k, v in cache[ym]["done"].items() if v == "no-contract")
     print("  已抓 %d、還要抓 %d（每筆約 270 根、約 25 KB；永豐每天有流量上限，用完明天再跑會接著抓）" % (done, len(todo)))
+    if n_nc:
+        print("  其中 %d 筆上次查不到合約（多半是合約表還沒載完），這次會重試；真的下市的會再記一次，不花流量。" % n_nc)
     print("  這台電腦：%s。兩台可以同時跑，各寫自己的檔，順序錯開，不會重複太多。" % host_tag())
     if a.list or not todo:
         return 0
@@ -218,6 +272,7 @@ def main():
     random.Random(host_tag()).shuffle(todo)      # 每台電腦用不同順序抓，兩台同時跑才不會抓同一批
     print("  登入永豐（只看行情）…")
     api = R._sj_login()
+    wait_contracts(api, [c for c, _ in todo[:400]])
     rb = remaining_bytes(api)
     if rb is not None:
         print("  永豐今日剩餘流量約 %.0f MB" % (rb / 1e6))
@@ -226,7 +281,7 @@ def main():
         ym = d[:7]
         if (c + "|" + d) in done_all[ym]:
             continue                                   # 另一台剛抓過了
-        ct = R._sj_contract(api, c)
+        ct = get_contract(api, c)
         if ct is None:
             cache[ym]["done"][c + "|" + d] = "no-contract"; dirty.add(ym); n_none += 1
             continue
