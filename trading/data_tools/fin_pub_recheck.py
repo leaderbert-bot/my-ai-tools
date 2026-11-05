@@ -351,7 +351,7 @@ def main():
         P("- B 實際公布後第一個收盤買：%s" % stat(res["B"]))
         P("- C 公布後下一個交易日收盤買：%s" % stat(res["C"]))
         if key == "xlev":
-            P("- 「前 20 個交易日先漲 ≥ 10% 不買」擋掉：A %d 筆、B %d 筆；流動性不足／鎖漲停剔除 %d 筆" % (n_pre["A"], n_pre["B"], n_ill))
+            P("- 「前 20 個交易日先漲 ≥ 10%% 不買」擋掉：A %d 筆、B %d 筆；流動性不足／鎖漲停剔除 %d 筆" % (n_pre["A"], n_pre["B"], n_ill))
         # 只比兩種都有的同一批（公平比較）
         both = [s for s in sig if (s[0], s[1]) in pub]
         pa, pb = [], []
