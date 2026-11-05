@@ -19,6 +19,7 @@ from datetime import date, datetime, timedelta
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 COST = 0.0047; HOLD = 20; SLOTS = 6; CAP = 3
+JUMPS = {}                      # code -> [超過漲跌停的日期]
 OTC_GAP = ("2006-11-25", "2007-06-30")
 
 
@@ -70,16 +71,9 @@ def load_px(root, L):
         rows.sort(key=lambda r: r[0])
         meta = L.get(c) or {}
         start = str(meta.get("d") or "")[:10]
-        if start and len(start) == 10 and start > "1990-01-01":
+        # list.json 的 d 只有落在 K 棒期間內才當上市日用（它常常是抓資料那天，不是上市日）
+        if start and len(start) == 10 and rows[0][0] < start <= rows[-1][0]:
             rows = [r for r in rows if r[0] >= start]
-        else:                                           # 沒有上市日（下市股）：最後一次「超過漲跌停」之後才算乾淨
-            last_bad = -1
-            for i in range(1, len(rows)):
-                lim = 0.075 if rows[i][0] < "2015-06-01" else 0.105
-                if abs(rows[i][4] / rows[i - 1][4] - 1) > lim:
-                    last_bad = i
-            if last_bad >= 0:
-                rows = rows[last_bad + 1:]
         # 除權息還原：除權息日之前的價格乘 ref/before
         for ev in divs.get(c) or []:
             try:
@@ -92,6 +86,13 @@ def load_px(root, L):
             for r in rows:
                 if r[0] < d0:
                     r[1] *= k; r[2] *= k; r[3] *= k; r[4] *= k
+        # 興櫃痕跡／減資跳空：超過漲跌停的那天記成 jump，之後 250 根內不出訊號（跟雷達 cr10_build 的 jump 一樣，不切掉歷史）
+        jumps = []
+        for i in range(1, len(rows)):
+            lim = 0.075 if rows[i][0] < "2015-06-01" else 0.105
+            if abs(rows[i][4] / rows[i - 1][4] - 1) > lim:
+                jumps.append(rows[i][0])
+        JUMPS[c] = jumps
         slot = {}
         for r in rows:
             slot[r[0]] = r[1:]
@@ -258,6 +259,11 @@ def build_cands(Rd, px, cal, taiex, rev, fin, L, since, until, log):
                 continue
             if cl[k] < 10:
                 continue
+            jl = JUMPS.get(c) or []
+            if jl:
+                j = bisect.bisect_right(jl, d) - 1
+                if j >= 0 and jl[j] >= ds[max(0, k - 250)]:
+                    continue
             v20 = sum(vol[k - 19:k + 1]) / 20.0
             if v20 < 500:
                 continue
