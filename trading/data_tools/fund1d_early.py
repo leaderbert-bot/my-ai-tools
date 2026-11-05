@@ -6,8 +6,8 @@
   20 日均量 ≥ 500 張、收盤 ≥ 10；收盤沒鎖漲停（2015-06 以前 7%：收 ≥ 昨收 ×1.065 且＝最高）；0050 在季線上（2003-09-22 前用加權指數季線）
   fundall＝任一點位；fund1D＝點位只限 1、D；fundhi＝再加 收盤 ≥ 近 250 日最高 95%
   帳戶：6 槽、每天最多 3 檔、收盤買、第 20 個交易日收盤賣、成本 0.47%
-  資料處理照早年回測報告：上市日前（興櫃）的 K 棒不用；上櫃股 2006-11-25～2007-06-30 的訊號不用；除權息用 FinMind 結果還原；
-  財報期限 2012 年度以前舊制（4/30、8/31、10/31、隔年 4/30），2013 起新制；月營收公布月 11 日起可用；FinMind EPS 是單季。
+  資料處理照早年回測報告：超過漲跌停的跳空（興櫃痕跡、減資）之後 250 根不出訊號；上櫃股 2006-11-25～2007-06-30 的訊號不用；
+  除權息用 FinMind 結果還原；財報期限 2012 年度以前舊制（4/30、8/31、10/31、隔年 4/30），2013 起新制；月營收公布月 11 日起可用；FinMind EPS 是單季。
 排序：原本「均量大先」、隨機 30 次、以及 11/05 排序測試選的「當天創新高優先、同級均量大先」（早年是它沒看過的資料，順便驗）。
 
 用法：雙擊「基本面1D早年驗證.bat」，或 python fund1d_early.py [--since 2003-01-01] [--until 2015-12-31]
@@ -44,7 +44,7 @@ def load_list(root):
 
 
 def load_px(root, L):
-    """{code: {d: [o,h,l,c,v張]}}；上市日前的不用；已下市的用「超過漲跌停」痕跡切；除權息還原。"""
+    """{code: {d: [o,h,l,c,v張]}}；除權息還原；超過漲跌停的跳空記在 JUMPS（之後 250 根不出訊號）。"""
     px = {}; cal = set()
     divs = {}
     for f in glob.glob(os.path.join(root, "div", "*.json.gz")):
@@ -385,7 +385,7 @@ def main():
     if os.path.exists(cache):
         try:
             ck = pickle.load(open(cache, "rb"))
-            if ck.get("since") == a.since and ck.get("until") == a.until and ck.get("n_px") == len(px):
+            if ck.get("since") == a.since and ck.get("until") == a.until and ck.get("n_px") == len(px) and ck.get("cands"):
                 cands = ck["cands"]; log("  用上次存的候選名單（%d 筆）" % len(cands))
         except Exception:
             cands = None
